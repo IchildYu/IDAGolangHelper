@@ -13,8 +13,11 @@ try:
 except:
     is_be = info.mf
 
+
 lookup = "FF FF FF FB 00 00" if is_be else "FB FF FF FF 00 00"
 lookup16 = "FF FF FF FA 00 00" if is_be else "FA FF FF FF 00 00"
+lookup18 = "FF FF FF F0 00 00" if is_be else "F0 FF FF FF 00 00"
+lookup20 = "FF FF FF F1 00 00" if is_be else "F1 FF FF FF 00 00"
 
 def check_is_gopclntab(addr):
     ptr = Utils.get_bitness(addr)
@@ -39,6 +42,21 @@ def check_is_gopclntab16(addr):
         return True
     return False
 
+def check_is_gopclntab18_20(addr):
+    print(f"renzo-----header_addr: {addr:x}")
+    ptr = Utils.get_bitness(addr)
+    offset = 8 + ptr.size *7 
+    first_entry = ptr.ptr(addr+offset) + addr
+    print(f"renzo-----pclntable_addr: {first_entry:x}")
+    func_loc = idc.get_wide_dword(first_entry)
+    struct_ptr = idc.get_wide_dword(first_entry+4) + first_entry
+    first_entry = idc.get_wide_dword(struct_ptr)
+    print(f"renzo-----func_loc: {func_loc:x}")
+    print(f"renzo-----first_entry: {first_entry:x}")
+    if func_loc == first_entry:
+        return True
+    return False
+
 def findGoPcLn():
     possible_loc = ida_search.find_binary(0, idc.BADADDR, lookup, 16, idc.SEARCH_DOWN) #header of gopclntab
     while possible_loc != idc.BADADDR:
@@ -56,6 +74,24 @@ def findGoPcLn():
         else:
             #keep searching till we reach end of binary
             possible_loc = ida_search.find_binary(possible_loc+1, idc.BADADDR, lookup16, 16, idc.SEARCH_DOWN)
+    #possible_loc = ida_search.find_binary(0, idc.BADADDR, lookup18, 16, idc.SEARCH_DOWN) #header of gopclntab
+    #while possible_loc != idc.BADADDR:
+    #    print(f"found possible 1.18 gopclntab")
+    #    if check_is_gopclntab18_20(possible_loc):
+    #        print("Looks like this is go1.18 binary")
+    #        return possible_loc
+    #    else:
+    #        #keep searching till we reach end of binary
+    #        possible_loc = ida_search.find_binary(possible_loc+1, idc.BADADDR, lookup18, 16, idc.SEARCH_DOWN)
+    possible_loc = ida_search.find_binary(0, idc.BADADDR, lookup20, 16, idc.SEARCH_DOWN) #header of gopclntab
+    while possible_loc != idc.BADADDR:
+        print(f"found possible 1.20 gopclntab")
+        if check_is_gopclntab18_20(possible_loc):
+            print("Looks like this is go1.20 binary")
+            return possible_loc
+        else:
+            #keep searching till we reach end of binary
+            possible_loc = ida_search.find_binary(possible_loc+1, idc.BADADDR, lookup20, 16, idc.SEARCH_DOWN)
     return None
 
 
@@ -116,3 +152,27 @@ def rename16(beg, ptr, make_funcs = True):
         # name = idc.get_strlit_contents(base + name_offset)
         # name = Utils.relaxName(name)
         # Utils.rename(func_addr, name)
+
+def rename120(beg, ptr, make_funcs = True):
+    base = beg
+    first_entry = ptr.ptr(base+ptr.size * 7 + 8) + base
+    cnt = ptr.ptr(base + 8)
+
+    func_entry = ptr.ptr(base + 8 + ptr.size * 2)
+    print("renzo-----func_entry: {:x}".format(func_entry))
+    funcname_start = base + ptr.ptr(base + 8 + ptr.size * 3)
+    print("renzo-----funcname_start: {:x}".format(funcname_start))
+
+    for i in range(cnt):
+        struct_ptr = idc.get_wide_dword(first_entry + i*4*2 + 4) + first_entry
+        # print(f"{struct_ptr:x}")
+        func_addr = func_entry + idc.get_wide_dword(first_entry + i*4*2)
+        str_val = idc.get_wide_dword(struct_ptr+4) + funcname_start
+        name = ida_bytes.get_strlit_contents(str_val, -1, -1) 
+        print(f"{func_addr:x} {name}")
+        if make_funcs == True:
+            ida_bytes.del_items(func_addr, 1, ida_bytes.DELIT_SIMPLE)
+            ida_funcs.add_func(func_addr)
+        # print(type(name))
+        name = Utils.relaxName(name.decode())
+        Utils.rename(func_addr, name)
