@@ -18,8 +18,10 @@ class GoSettings(object):
         self.processor = None
         self.typer = None
         self.is116 = False
+        self.is120 = False
 
     def getVal(self, key):
+        #print("renzo-----storage: ", self.storage)
         if key in self.storage:
             return self.storage[key]
         return None
@@ -32,6 +34,7 @@ class GoSettings(object):
         if gopcln_addr is None:
             gopcln_addr = Gopclntab.findGoPcLn()
             print("Saving gopclntab entry")
+            #print("renzo-----getGopcln: {:x}".format(gopcln_addr))
             self.setVal("gopcln", gopcln_addr)
         return gopcln_addr
 
@@ -44,6 +47,7 @@ class GoSettings(object):
 
     def tryFindGoVersion(self):
         fmd = self.getVal("firstModData")
+        #print("renzo-----firstModData: ", fmd)
         if fmd is None:
             return "This should be go <= 1.4 : No module data found"
         vers = "go1.5 or go1.6"
@@ -54,19 +58,29 @@ class GoSettings(object):
         elif Firstmoduledata.isGo116(fmd, self.bt_obj) is True:
             vers = "go1.16"
             self.is116 = True
+            self.is120 = False
         return "According to moduleData struct is should be %s" % (vers)
 
     def renameFunctions(self):
         gopcln_tab = self.getGopcln()
+        print("gopcln_tab: {:x}".format(gopcln_tab))
         if self.is116:
             Gopclntab.rename16(gopcln_tab, self.bt_obj)
+        elif self.is120:
+            Gopclntab.rename120(gopcln_tab, self.bt_obj)
         else:
             Gopclntab.rename(gopcln_tab, self.bt_obj)
 
     def getVersionByString(self):
         # pos = idautils.Functions().next()
         end_ea = idc.get_segm_end(0)
+        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 32 30", 16, idc.SEARCH_DOWN) != idc.BADADDR:
+            self.is116 = False
+            self.is120 = True
+            return 'Go 1.20'
         if ida_search.find_binary(0, end_ea, "67 6f 31 2e 31 36", 16, idc.SEARCH_DOWN) != idc.BADADDR:
+            self.is116 = True
+            self.is120 = False
             return 'Go 1.16'
         if ida_search.find_binary(0, end_ea, "67 6f 31 2e 31 33", 16, idc.SEARCH_DOWN) != idc.BADADDR:
             return 'Go 1.13'
