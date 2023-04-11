@@ -11,3 +11,8 @@ Differences:
 
 
 https://2016.zeronights.ru/wp-content/uploads/2016/12/GO_Zaytsev.pdf - My presentation about Golang reversing
+
+support go 1.20 but no 1.18(i have no the sample with go 1.18)
+
+pcln struct: https://go.dev/src/debug/gosym/pclntab.go
+func struct: https://go.dev/src/runtime/runtime2.go
