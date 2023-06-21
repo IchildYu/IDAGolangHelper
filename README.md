@@ -1,3 +1,5 @@
+# 短期内大改，颠覆go逆向。
+
 # IDAGolangHelper
 Set of IDA Pro scripts for parsing GoLang types information stored in compiled binary
 
