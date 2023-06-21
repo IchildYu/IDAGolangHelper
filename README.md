@@ -8,9 +8,17 @@
 
 （仅限于 ida 7.5 及以下版本，更高版本 ida 兼容了对 Go 调用约定伪代码会好看很多）
 
+这还不够？再放两张对比图。
+
+![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/b9abb28c-7368-43c2-82b8-8e08385cf82b)
+
+![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/90072d63-d0bf-4841-95d6-b59abff008b8)
+
+解释一下，这张图里这么多红色的 v4 不是错误，而是 v4 是 xmm15 全 0 ，这些赋值都是清零操作。
+
 ===========================
 
-以下是原 readme
+# 以下是原 readme
 
 ===========================
 
