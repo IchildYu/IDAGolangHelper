@@ -1,4 +1,4 @@
-# 短期内大改，效果如下。
+# 近期内大改，效果如下。
 
 你以为的 Go 逆向（就算通过插件恢复出了函数名， F5 仍然没法看，函数参数完全错误，伪代码依托答辩）：
 ![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/828d2061-73ae-4464-b545-9ec64b66c018)
