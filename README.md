@@ -1,6 +1,6 @@
 # Task Done
 
-## How to use
+## Preparation
 
 Download and place file `GolangHelper.py` and directory `GoUtils` under ida plugin directory, shown as below.
 
@@ -16,8 +16,55 @@ Download and place file `GolangHelper.py` and directory `GoUtils` under ida plug
   |- ...
 ```
 
-When you load ...
+When you open ida, you can see `[+] GolangHelper loaded` in the output window and an extra menu in the menu bar:
 
+![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/21173e8a-6737-4217-91f3-0587790924e9)
+
+And, to use GolangHelper, you need a golang binary.
+
+## Plugin main
+
+After loading a golang binary and finishing the initial autoanalysis of ida, just click `GolangHelper main`, and a form emerges.
+
+![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/117f57fd-b370-4258-a6c0-2557b9614888)
+
+## Set function types
+
+The last 2 functions do not need go version and gopclntab.
+
+Golang uses a different calling convention. From ida 7.7 this calling convention was introduced and named as `__golang`. But I guess many of us are still using 7.5, so it's difficult recover beautiful pseudocode with F5. 
+
+Luckily, we have another option: `__usercall`(see [Igor’s tip of the week #51: Custom calling conventions – Hex Rays](https://hex-rays.com/blog/igors-tip-of-the-week-51-custom-calling-conventions/)). We can set function type with `__usercall` and specify every register in the parameters. But we still need to edit every function type manually, that's painful.
+
+Later I found something interesting. Most functions would check stack size and call `runtime.morestack_noctxt` at the beginning, which is clear in the pseudocode. But there's something more, this function would save the parameters before going to `runtime.morestack_noctx`, shown as below.
+
+![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/ee3460a9-d1b8-4c26-843d-6eba3e83cf4f)
+
+Apparently, we can utilize this and get to know the count of parameters of this function automatically, and use `__usercall`! For return values, it's still difficult to specify more than 2 registers (in fact, we can, but it makes little effect in pseudocode), so I just set 2 regs to return and spoils other 3 regs: `_OWORD __usercall _@<rbx:rax>([parameters...])`.
+
+Just try clicking `Set function types`, the effect will be obvious.
+
+## Detect strings
+
+Unlike C string ending with NULL, golang gathers many strings together without NULL, and specifies the length of every string (either in data, as string structure or in code). And it's another pain for ida 7.5, that ida only recognize this whole string.
+
+`Detect strings` would take them apart.
+
+## Detect go version and gopclntab
+
+Similar to that of original IDAGolangHelper. But this can be wrong. So I added `Set gopclntab manually` option if you can find the correct address. How to find gopclntab manually is not the topic here.
+
+## Rename functions
+
+Similar to that of original IDAGolangHelper.
+
+## Parse go type names
+
+Parses only type names.
+
+## Parse current go type name
+
+Place your cursor at the type and click this after setting gopclntab.
 
 ===========================
 
