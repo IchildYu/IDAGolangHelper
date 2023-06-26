@@ -1,3 +1,5 @@
+import idaapi
+import ida_ida
 import ida_enum
 import ida_struct
 import idc
@@ -20,19 +22,39 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
 
 
 def rename(offset, name):
+    '''
     res = idc.set_name(offset, name, idc.SN_NOWARN)
     if res == 0:
         name = name+"_autogen_"+id_generator()
         idc.set_name(offset, name, idc.SN_NOWARN)
-
+    '''
+    res = idc.set_name(offset, name, idc.SN_NOWARN)
+    if res == 0 and (idaapi.get_name(offset) == '' or idaapi.get_name(offset).startswith('sub_')):
+        index = 1
+        while index < 100 and res == 0: # set max 99 to avoid potential endless loop
+            res = idc.set_name(offset, name + '_%d' % index, idc.SN_NOWARN)
+            index += 1
+        return False
+    return res
 
 def relaxName(name):
-    name = name.replace('.', '_').replace("<-", '_chan_left_').replace('*', '_ptr_').replace('-', '_').replace(';','').replace('"', '').replace('\\', '')
-    name = name.replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_').replace(',', 'comma').replace('{','').replace('}', '').replace('[', '').replace(']', '')
+    # ida can handle many chars.
+    # name = name.replace('.', '_').replace("<-", '_chan_left_').replace('*', '_ptr_').replace('-', '_').replace(';','').replace('"', '').replace('\\', '')
+    # name = name.replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_').replace(',', 'comma').replace('{','').replace('}', '').replace('[', '').replace(']', '')
+    # replace only those needed
+    name = name\
+        .replace('/', '_')\
+        .replace('*', '_')\
+        .replace(' ', '_')\
+        .replace(';', '_')\
+        .replace('-', '_')\
+        .replace('{', '_')\
+        .replace('}', '_')
     return name
 
 
-def get_bitness(addr):
+def get_bitness(addr=None):
+    if addr == None: addr = ida_ida.inf_get_min_ea()
     ptr = bits32
     if idc.get_segm_attr(addr, idc.SEGATTR_BITNESS) == 2:
         ptr = bits64
@@ -52,7 +74,6 @@ def is_hardcoded_slice(addr, bt_obj):
 
 
 class StructCreator(object):
-
     def __init__(self, bt_obj):
         self.types_id = {}
         if bt_obj.size == 8:
