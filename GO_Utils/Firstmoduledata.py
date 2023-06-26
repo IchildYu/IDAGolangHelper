@@ -1,17 +1,18 @@
-from . import Utils
+
 import idautils
 import struct
+from . import Utils
 
 def findFirstModuleData(addr, bt):
-	# print(f"{addr:x}")
-	possible_addr = [x for x in idautils.XrefsTo(addr)]
-	for p_a in possible_addr:
-		# print(f"Checking addr: {p_a}")
-		if Utils.is_hardcoded_slice(p_a.frm, bt):
-			return p_a.frm
-		elif Utils.is_hardcoded_slice(p_a.frm+bt.size, bt):
-			return p_a.frm
-	return None
+    # print(f"{addr:x}")
+    possible_addr = [x for x in idautils.XrefsTo(addr)]
+    for p_a in possible_addr:
+        # print(f"Checking addr: {p_a}")
+        if Utils.is_hardcoded_slice(p_a.frm, bt):
+            return p_a.frm
+        elif Utils.is_hardcoded_slice(p_a.frm+bt.size, bt):
+            return p_a.frm
+    return None
 
 def isGo17(addr, bt):
     addr += bt.size * 27
