@@ -1,166 +1,135 @@
-import idaapi
 from . import Gopclntab
-from . import Utils
-from . import Firstmoduledata
 from . import Types
+from . import Firstmoduledata
+from . import Utils
+from . import GoStrings
+
 import idc
 import idautils
 import ida_ida
-import ida_search
+import ida_bytes
+import ida_segment
+import idaapi
+import re
 
-class GoSettings(object):
+bt_obj = Utils.get_bitness(ida_ida.inf_get_min_ea())
+def find_gopclntab():
+    seg = ida_segment.get_segm_by_name('.gopclntab')
+    if seg:
+        print('.gopclntab segment found: 0x%x' % seg.start_ea)
+        return seg.start_ea
+    else:
+        addr = Gopclntab.findGoPcLn()
+        if addr:
+            print('possible gopclntab found: 0x%x (Might be wrong. Consider setting it manually)' % addr)
+        return addr
 
+def find_go_version(gopclntab):
+    possible_go_versions = []
+    addr = ida_bytes.bin_search(0, idc.BADADDR, b'go1.', None, 0, ida_bytes.BIN_SEARCH_FORWARD)
+    while addr != idc.BADADDR:
+        print('go version string found at 0x%x' % addr)
+        for i in idautils.XrefsTo(addr):
+            size = bt_obj.ptr(i.frm + bt_obj.size)
+            # print(hex(addr), size)
+            if size == 0 or size > 10: continue
+            s = ida_bytes.get_bytes(addr, size).decode()
+            if not re.match('go1\.[0-9]+\.[0-9]+', s): continue
+            s = 'go ' + s[2: s.rindex('.')]
+            if s not in possible_go_versions and Gopclntab.check_go_version(gopclntab, s):
+                possible_go_versions.append(s)
+        addr = ida_bytes.bin_search(addr + 1, idc.BADADDR, b'go1.', None, 0, ida_bytes.BIN_SEARCH_FORWARD)
+    if len(possible_go_versions) == 1:
+        return possible_go_versions[0]
+    elif len(possible_go_versions) > 1:
+        print('Found possible go version:')
+        for i in possible_go_versions:
+            print(i)
+        return possible_go_versions[0]
+    else: # go version string not found
+        print('Version may be inexact:')
+        return Gopclntab.get_inexact_version(gopclntab)
 
-    def __init__(self):
-        self.storage = {}
-        self.bt_obj = Utils.get_bitness(ida_ida.inf_get_min_ea())
-        self.structCreator = Utils.StructCreator(self.bt_obj)
-        self.processor = None
-        self.typer = None
-        self.is116 = False
-        self.is120 = False
+def renameFunctions(gopclntab, go_version):
+    return Gopclntab.renameFunctions(gopclntab, go_version, bt_obj)
 
-    def getVal(self, key):
-        #print("renzo-----storage: ", self.storage)
-        if key in self.storage:
-            return self.storage[key]
-        return None
+def to_full_reg_name(reg):
+    return ['rax', 'rbx', 'rcx', 'rdi', 'rsi', 'r8', 'r9', 'r10', 'r11'][
+        [
+            'rax', 'rbx', 'rcx', 'rdi', 'rsi', 'r8', 'r9', 'r10', 'r11',
+            'eax', 'ebx', 'ecx', 'edi', 'esi', 'r8d', 'r9d', 'r10d', 'r11d', # in ida it is r8d not er8
+            'ax', 'bx', 'cx', 'di', 'si', 'r8w', 'r9w', 'r10w', 'r11w', # not sure
+            'al', 'bl', 'cl', 'dil', 'sil', 'r8b', 'r9b', 'r10b', 'r11b'
+        ].index(reg) % 9
+    ]
 
-    def setVal(self, key, val):
-        self.storage[key] = val
+def generate_functype(args):
+    # 5 return regs may be enough
+    # Instead of "_OWORD __spoils<rcx, rdi, rsi> @<rbx:rax>", you can also
+    # set return type as "pair__slice_err @<0: rax, 8: rbx, 16: rcx, 24: rdi, 32: rsi>"
+    # But it does little help to F5. This is enough.
+    if not args: return '_OWORD __usercall __spoils<rcx, rdi, rsi> _@<rbx:rax>()'
 
-    def getGopcln(self):
-        gopcln_addr = self.getVal("gopcln")
-        if gopcln_addr is None:
-            gopcln_addr = Gopclntab.findGoPcLn()
-            print("Saving gopclntab entry")
-            #print("renzo-----getGopcln: {:x}".format(gopcln_addr))
-            self.setVal("gopcln", gopcln_addr)
-        return gopcln_addr
+    # 9 argument regs may be enough
+    go_args = ['rax', 'rbx', 'rcx', 'rdi', 'rsi', 'r8', 'r9', 'r10', 'r11']
+    if len(args) > len(go_args):
+        assert False, args
+    for i in range(len(args)):
+        if go_args[i] not in args:
+            assert False, args
+    return '_OWORD __usercall __spoils<rcx, rdi, rsi> _@<rbx:rax>(_QWORD@<' + '>, _QWORD@<'.join(go_args[: len(args)]) + '>)'
 
-    def findModuleData(self):
-        gopcln_addr = self.getGopcln()
-        if gopcln_addr is not None:
-            fmd = Firstmoduledata.findFirstModuleData(gopcln_addr, self.bt_obj)
-            self.setVal("firstModData", fmd)
+def retype_gofunc(addr):
+    func_addr = addr
+    functype = idc.get_type(func_addr)
+    if functype and '__usercall' in functype: # already defined, or edit by user.
         return
-
-    def tryFindGoVersion(self):
-        fmd = self.getVal("firstModData")
-        #print("renzo-----firstModData: ", fmd)
-        if fmd is None:
-            return "This should be go <= 1.4 : No module data found"
-        vers = "go1.5 or go1.6"
-        if Firstmoduledata.isGo17(fmd, self.bt_obj) is True:
-            vers = "go1.7"
-        elif Firstmoduledata.isGo18_10(fmd, self.bt_obj) is True:
-            vers = "go1.8 or go1.9 or go1.10"
-        elif Firstmoduledata.isGo116(fmd, self.bt_obj) is True:
-            vers = "go1.16"
-            self.is116 = True
-            self.is120 = False
-        return "According to moduleData struct is should be %s" % (vers)
-
-    def renameFunctions(self):
-        gopcln_tab = self.getGopcln()
-        print("gopcln_tab: {:x}".format(gopcln_tab))
-        if self.is116:
-            Gopclntab.rename16(gopcln_tab, self.bt_obj)
-        elif self.is120:
-            Gopclntab.rename120(gopcln_tab, self.bt_obj)
-        else:
-            Gopclntab.rename(gopcln_tab, self.bt_obj)
-
-    def getVersionByString(self):
-        # pos = idautils.Functions().next()
-        end_ea = idc.get_segm_end(0)
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 32 30", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            self.is116 = False
-            self.is120 = True
-            return 'Go 1.20'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 31 36", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            self.is116 = True
-            self.is120 = False
-            return 'Go 1.16'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 31 33", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.13'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 31 32", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.12'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 31 31", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.11'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 31 30", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.10'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 39", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.9'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 38", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.8'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 37", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.7'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 36", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.6'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 35", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.5'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 34", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.4'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 33", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.3'
-        if ida_search.find_binary(0, end_ea, "67 6f 31 2e 32", 16, idc.SEARCH_DOWN) != idc.BADADDR:
-            return 'Go 1.2'
-
-    def createTyper(self, typ):
-        if typ == 0:
-            self.typer = Types.Go12Types(self.structCreator)
-        elif typ == 1:
-            self.typer = Types.Go14Types(self.structCreator)
-        elif typ == 2:
-            self.typer = Types.Go15Types(self.structCreator)
-        elif typ == 3:
-            self.typer = Types.Go16Types(self.structCreator)
-        elif typ == 4 or typ == 5:
-            self.typer = Types.Go17Types(self.structCreator)
-        elif typ == 6: #1.9
-            self.typer = Types.Go17Types(self.structCreator)
-        elif typ == 7: #1.10
-            self.typer = Types.Go17Types(self.structCreator)
-        elif typ == 8: #1.16
-            self.typer = Types.Go116Types(self.structCreator)
-        elif typ == 9: #1.17
-            self.typer = Types.Go117Types(self.structCreator)
-
-    def typesModuleData(self, typ):
-        if typ < 2:
-            return
-        if self.getVal("firstModData") is None:
-            self.findModuleData()
-        fmd = self.getVal("firstModData")
-        if fmd is None:
-            return
-        if self.typer is None:
-            self.createTyper(typ)
-        robase = None
-        if typ == 4:
-            beg, end, robase = Firstmoduledata.getTypeinfo17(fmd, self.bt_obj)
-            self.processor = Types.TypeProcessing17(beg, end, self.bt_obj, self, robase)
-        elif typ == 5:
-            beg, end, robase = Firstmoduledata.getTypeinfo18(fmd, self.bt_obj)
-            self.processor = Types.TypeProcessing17(beg, end, self.bt_obj, self, robase)
-        elif typ == 6:
-            beg, end, robase = Firstmoduledata.getTypeinfo18(fmd, self.bt_obj)
-            self.processor = Types.TypeProcessing19(beg, end, self.bt_obj, self, robase)
-        elif typ == 7:
-            beg, end, robase = Firstmoduledata.getTypeinfo18(fmd, self.bt_obj)
-            self.processor = Types.TypeProcessing19(beg, end, self.bt_obj, self, robase)
-        elif typ == 8:
-            beg, end, robase = Firstmoduledata.getTypeinfo116(fmd, self.bt_obj)
-            self.processor = Types.TypeProcessing116(beg, end, self.bt_obj, self, robase)
-        elif typ == 9:
-            beg, end, robase = Firstmoduledata.getTypeinfo117(fmd, self.bt_obj)
-            self.typer.update_robase(robase)
-            self.processor = Types.TypeProcessing117(beg, end, self.bt_obj, self, robase)            
-        else:
-            beg, end = Firstmoduledata.getTypeinfo(fmd, self.bt_obj)
-            self.processor = Types.TypeProcessing(beg, end, self.bt_obj, self)
-        print("%x %x %x" % (beg, end, robase))
-        for i in self.processor:
-            pass
+    code = idc.GetDisasm(addr)
+    addr += idc.get_item_size(addr)
+    if re.match('cmp +rsp, \[r14\+.*\]', code): # cmp     rsp, [r14+10h]
+        pass
+    elif re.match('lea +r12, \[rsp.+\]', code) and re.match('cmp +r12, \[r14\+.*\]', idc.GetDisasm(addr)): # lea     r12, [rsp+var_28+8]; cmp     r12, [r14+10h]
+        addr += idc.get_item_size(addr)
+    else:
         return
+    code = idc.GetDisasm(addr)
+    if not re.match('jbe +.*', code): # jbe     loc_xxxxxx
+        return
+    if 'short' in code:
+        assert idc.get_item_size(addr) == 2, hex(addr)
+        addr = addr + ida_bytes.get_byte(addr + 1) + 2
+    else:
+        assert idc.get_item_size(addr) == 6, hex(addr)
+        addr = addr + ida_bytes.get_dword(addr + 2) + 6
+    regs_to_save = []
+    code = idc.GetDisasm(addr)
+    while not re.match('call +.*', code):
+        if re.match('mov +(.* ptr )?\[rsp.+\], .*', code): # mov     [rsp+0A0h+var_98], rax
+            reg = code[code.rindex(' ') + 1:]
+            reg = to_full_reg_name(reg)
+            regs_to_save.append(reg)
+        addr += idc.get_item_size(addr)
+        code = idc.GetDisasm(addr)
+    functype = generate_functype(regs_to_save)
+    print('0x%x -> %s' % (func_addr, functype))
+    idc.SetType(func_addr, functype)
+
+
+def retypeFunctions():
+    if idaapi.get_inf_structure().get_procName() != 'metapc' or not idaapi.get_inf_structure().is_64bit():
+        print('Only x86-64 supported.')
+        return
+    for func_addr in idautils.Functions():
+        retype_gofunc(func_addr)
+
+
+def parse_types(gopclntab, go_version):
+    fmd = Firstmoduledata.findFirstModuleData(gopclntab, bt_obj)
+    Types.parse_type_names(fmd, go_version, bt_obj)
+
+def parse_type(type_addr, gopclntab, go_version):
+    fmd = Firstmoduledata.findFirstModuleData(gopclntab, bt_obj)
+    return Types.parse_type_name_at(type_addr, fmd, go_version, bt_obj)
+
+def detect_string():
+    GoStrings.detect_string()
