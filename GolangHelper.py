@@ -149,8 +149,10 @@ class GolangHelperPlugin(idaapi.plugin_t):
             return idaapi.AST_ENABLE_ALWAYS
 
     def init(self):
+        menu_name = "MyTools"
+        idaapi.create_menu(menu_name, menu_name, "Help")
         action = GolangHelperPlugin.ActionHandler("GolangHelper:main", "GolangHelper main")
-        if action.register_action(GolangHelper_main, "MyTools"):
+        if action.register_action(GolangHelper_main, menu_name):
             print('[+] GolangHelper loaded')
             return idaapi.PLUGIN_OK
         print('[-] GolangHelper failed to load')
