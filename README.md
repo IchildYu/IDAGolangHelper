@@ -1,24 +1,27 @@
-# 近期内大改，效果如下。
+# Task Done
 
-你以为的 Go 逆向（就算通过插件恢复出了函数名， F5 仍然没法看，函数参数完全错误，伪代码依托答辩）：
-![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/828d2061-73ae-4464-b545-9ec64b66c018)
+## How to use
 
-实际的 Go 逆向（仅通过插件即可恢复到这样的形式。还有一些瑕疵，需要再手动改动一些地方。动调？不如静态分析）：
-![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/d25122bc-8220-40b0-97e6-5cb69eec54be)
+Download and place file `GolangHelper.py` and directory `GoUtils` under ida plugin directory, shown as below.
 
-（仅限于 ida 7.5 及以下版本，更高版本 ida 兼容了对 Go 调用约定伪代码会好看很多）
+```
+|- $IDA_HOME
+  |- ...
+  |- plugins
+    |- ...
+    |- GoUtils
+      |- *.py
+    |- GolangHelper.py
+    |- ...
+  |- ...
+```
 
-这还不够？再放两张对比图。
+When you load ...
 
-![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/b9abb28c-7368-43c2-82b8-8e08385cf82b)
-
-![image](https://github.com/IchildYu/IDAGolangHelper/assets/54837947/90072d63-d0bf-4841-95d6-b59abff008b8)
-
-解释一下，这张图里这么多红色的 v4 不是错误，而是 v4 是 xmm15 全 0 ，这些赋值都是清零操作。
 
 ===========================
 
-# 以下是原 readme
+# Original README: 
 
 ===========================
 
