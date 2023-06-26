@@ -54,6 +54,8 @@ Unlike C string ending with NULL, golang gathers many strings together without N
 
 Similar to that of original IDAGolangHelper. But this can be wrong. So I added `Set gopclntab manually` option if you can find the correct address. How to find gopclntab manually is not the topic here.
 
+All functions below rely on gopclntab and version.
+
 ## Rename functions
 
 Similar to that of original IDAGolangHelper.
