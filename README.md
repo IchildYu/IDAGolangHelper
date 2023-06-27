@@ -1,3 +1,7 @@
+# Updated
+
+Renamed folder GO_Utils to GoUtils (used in GolangHelper.py)
+
 # Task Done
 
 ## Preparation
