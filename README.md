@@ -1,5 +1,6 @@
 # Updated
 
+- Updated `get_typename` in `Types.py`
 - Renamed folder GO_Utils to GoUtils (used in GolangHelper.py)
 
 # Task Done
