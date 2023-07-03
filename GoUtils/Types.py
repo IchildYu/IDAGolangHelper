@@ -22,8 +22,6 @@ get_typelink_and_types_offset = {}
 get_typename = {}
 for i in range(16):
     get_typelink_and_types_offset['go 1.' + str(i)] = lambda bt_obj: (bt_obj.size * 30, bt_obj.size * 25)
-    get_typename['go 1.' + str(i)] = get_typename_varlen
-for i in range(8):
     get_typename['go 1.' + str(i)] = lambda name_addr: ida_bytes.get_bytes(name_addr + 3, int.from_bytes(ida_bytes.get_bytes(name_addr + 1, 2), 'big')).decode()
 get_typelink_and_types_offset['go 1.16'] = lambda bt_obj: (bt_obj.size * 40, bt_obj.size * 35)
 get_typelink_and_types_offset['go 1.17'] = lambda bt_obj: (bt_obj.size * 40, bt_obj.size * 35)
