@@ -2,13 +2,13 @@ import idaapi
 import ida_kernwin
 
 class GolangHelper:
+    VERSIONS = [
+        ['go 1.2', 'go 1.3', 'go 1.4', 'go 1.5', 'go 1.6', 'go 1.7', 'go 1.8', 'go 1.9', 'go 1.10', 'go 1.11', 'go 1.12', 'go 1.13', 'go 1.14', 'go 1.15'],
+        ['go 1.16', 'go 1.17'],
+        ['go 1.18', 'go 1.19'],
+        ['go 1.20']
+    ]
     class MyForm(idaapi.Form):
-        VERSIONS = [
-            ['go 1.2', 'go 1.3', 'go 1.4', 'go 1.5', 'go 1.6', 'go 1.7', 'go 1.8', 'go 1.9', 'go 1.10', 'go 1.11', 'go 1.12', 'go 1.13', 'go 1.14', 'go 1.15'],
-            ['go 1.16', 'go 1.17'],
-            ['go 1.18', 'go 1.19'],
-            ['go 1.20'],
-        ]
         def __init__(self):
             import GoUtils
             idaapi.require("GoUtils")
@@ -17,21 +17,27 @@ class GolangHelper:
             idaapi.require("GoUtils.Types")
             idaapi.require("GoUtils.Firstmoduledata")
             idaapi.require("GoUtils.GoStrings")
+            idaapi.require("GoUtils.PatchNewVersion")
+            GoUtils.PatchNewVersion.apply_patches(GolangHelper)
 
             self.gopclntab = 0
             self.go_version = 'go 1.2'
             self.invert = False
-            idaapi.Form.__init__(self, r"""STARTITEM {id:cGoVers}
+            form_item = r'''STARTITEM {id:cGoVers}
 GolangHelper
 
 {FormChangeCb}
 <##Detect go version and gopclntab:{detect_btn}>
 <##    Set gopclntab manually     :{set_gopclntab_btn}>
 Go version:
-<Go1.2-1.15:{r2}>
-<Go1.16-1.17:{r16}>
-<Go1.18-1.19:{r18}>
-<Go1.20:{r20}>{cGoVers}>
+'''
+            for versions in GolangHelper.VERSIONS:
+                if len(versions) == 1:
+                    form_item += '<%s:{%s}>\n' % (versions[0], versions[0])
+                else:
+                    form_item += '<%s-%s:{%s}>\n' % (versions[0], versions[-1], versions[0])
+
+            form_item = form_item[: -1] + '''{cGoVers}>
 --------------------------------
 <##       Rename functions        :{rename_func_btn}>
 <##      Parse go type names      :{parse_types_btn}>
@@ -39,10 +45,12 @@ Go version:
 --------------------------------
 <##  Set function types (simple)  :{retype_func_btn}>
 <##     Detect strings (slow)     :{detect_string_btn}>
-""", {
+'''
+            # print(repr(form_item))
+            idaapi.Form.__init__(self, form_item, {
                 'detect_btn': idaapi.Form.ButtonInput(self.detect),
                 'set_gopclntab_btn': idaapi.Form.ButtonInput(self.set_gopclntab),
-                'cGoVers': idaapi.Form.RadGroupControl(("r2", "r16", "r18", "r20")),
+                'cGoVers': idaapi.Form.RadGroupControl(tuple(i[0] for i in GolangHelper.VERSIONS)),
                 'rename_func_btn': idaapi.Form.ButtonInput(self.rename_func),
                 'parse_types_btn': idaapi.Form.ButtonInput(self.parse_types),
                 'parse_type_btn': idaapi.Form.ButtonInput(self.parse_type),
@@ -54,8 +62,8 @@ Go version:
         def find_version(self, gopclntab):
             vers = GoUtils.find_go_version(gopclntab)
             if vers:
-                for i in range(len(self.VERSIONS)):
-                    if vers in self.VERSIONS[i]:
+                for i in range(len(GolangHelper.VERSIONS)):
+                    if vers in GolangHelper.VERSIONS[i]:
                         self.go_version = vers
                         print('Set go version "' + vers + '"')
                         self.SetControlValue(self.cGoVers, i)
@@ -85,8 +93,8 @@ Go version:
             if self.gopclntab == 0:
                 print('Please set gopclntab and go version first.')
                 return
-            if self.go_version not in self.VERSIONS[self.GetControlValue(self.cGoVers)]:
-                self.go_version = self.VERSIONS[self.GetControlValue(self.cGoVers)][0]
+            if self.go_version not in GolangHelper.VERSIONS[self.GetControlValue(self.cGoVers)]:
+                self.go_version = GolangHelper.VERSIONS[self.GetControlValue(self.cGoVers)][0]
                 print('Set go version "' + self.go_version + '"')
             GoUtils.renameFunctions(self.gopclntab, self.go_version)
 
@@ -109,8 +117,8 @@ Go version:
             GoUtils.detect_string()
 
         def OnFormChange(self, fid):
-            if self.go_version not in self.VERSIONS[self.GetControlValue(self.cGoVers)]:
-                self.go_version = self.VERSIONS[self.GetControlValue(self.cGoVers)][0]
+            if self.go_version not in GolangHelper.VERSIONS[self.GetControlValue(self.cGoVers)]:
+                self.go_version = GolangHelper.VERSIONS[self.GetControlValue(self.cGoVers)][0]
                 print('Set go version "' + self.go_version + '"')
             return 1
 
