@@ -1,7 +1,8 @@
 # Updated
 
-- Updated `get_typename` in `Types.py`
-- Renamed folder GO_Utils to GoUtils (used in GolangHelper.py)
+- 2023 08.29: Add support for 1.21 (updated `GolangHelper.py` and added a file `GoUtils/PatchNewVersion.py`)
+- 2023 07.03: Updated `get_typename` in `Types.py`
+- 2023 06.27: Renamed folder GO_Utils to GoUtils (used in GolangHelper.py)
 
 # Task Done
 
