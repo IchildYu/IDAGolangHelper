@@ -119,9 +119,14 @@ def retypeFunctions():
     if idaapi.get_inf_structure().get_procName() != 'metapc' or not idaapi.get_inf_structure().is_64bit():
         print('Only x86-64 supported.')
         return
+    error_lines = []
     for func_addr in idautils.Functions():
-        retype_gofunc(func_addr)
-
+        try:
+            retype_gofunc(func_addr)
+        except Exception as e:
+            error_lines.append('Error at 0x%x: %s' % (func_addr, str(e)))
+    for i in error_lines:
+        print(i)
 
 def parse_types(gopclntab, go_version):
     fmd = Firstmoduledata.findFirstModuleData(gopclntab, bt_obj)
