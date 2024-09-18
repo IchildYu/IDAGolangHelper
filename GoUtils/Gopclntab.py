@@ -23,7 +23,7 @@ def check_is_gopclntab16(addr):
     ptr = Utils.get_bitness(addr)
     if addr & (ptr.size - 1): return False
     if ida_bytes.get_byte(addr + 7) != ptr.size: return False
-    offset = 8 + ptr.size *6 
+    offset = 8 + ptr.size * 6
     # print(f"{addr+offset:x}")
     first_entry = ptr.ptr(addr+offset) + addr
     # print(f"{first_entry:x}")
@@ -52,7 +52,15 @@ def check_is_gopclntab18_20(addr):
     return False
 
 def set_funcname(func_addr, name_addr):
+    # if make_funcs == True:
+    if True:
+        # ida_bytes.del_items(func_addr, 1, ida_bytes.DELIT_DELNAMES)
+        ida_bytes.del_items(func_addr)
+        ida_funcs.add_func(func_addr)
     nameb = ida_bytes.get_strlit_contents(name_addr, -1, -1)
+    if nameb == None:
+        print(f"{func_addr:x} ('{idaapi.get_name(func_addr)}') has no name!")
+        return
     ida_bytes.del_items(name_addr)
     if ida_bytes.get_byte(name_addr + len(nameb)) == 0:
         ida_bytes.create_strlit(name_addr, len(nameb) + 1, -1)
@@ -61,11 +69,6 @@ def set_funcname(func_addr, name_addr):
     name = Utils.relaxName(nameb.decode())
     if name == idaapi.get_name(func_addr): return
     print(f"{func_addr:x} ('{idaapi.get_name(func_addr)}') -> '{nameb.decode()}' ('{name}') ... ", end='')
-    # if make_funcs == True:
-    if True:
-        # ida_bytes.del_items(func_addr, 1, ida_bytes.DELIT_DELNAMES)
-        ida_bytes.del_items(func_addr)
-        ida_funcs.add_func(func_addr)
     if Utils.rename(func_addr, name): print('done')
     else: print('error')
 

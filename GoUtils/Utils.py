@@ -151,4 +151,3 @@ class StructCreator(object):
     def createEnums(self, enums):
         for i in enums:
             self.createEnum(i)
-

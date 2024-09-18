@@ -61,4 +61,3 @@ def detect_string():
             ida_bytes.del_items(addr)
             ida_bytes.create_strlit(addr, length, -1)
             addr += length
-
